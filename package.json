@@ -1,6 +1,6 @@
 {
   "name": "testtoggler",
-	"displayName": "TestToggler",
+	"displayName": "Test Toggler",
 	"description": "Toggle back and forth from tests and source",
 	"version": "0.0.1",
 	"engines": {
@@ -10,16 +10,24 @@
 		"Other"
 	],
 	"activationEvents": [
-        "onCommand:testtoggler.helloWorld"
+        "onCommand:extension.testToggler"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
 			{
-				"command": "testtoggler.helloWorld",
-				"title": "Hello World"
+				"command": "extension.testToggler",
+				"title": "Toggle source/tests"
 			}
-		]
+		],
+    "keybindings": [
+      {
+        "command": "extension.testToggler",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "editorTextFocus"
+      }
+    ]
 	},
 	"scripts": {
 		"vscode:prepublish": "yarn run compile",
