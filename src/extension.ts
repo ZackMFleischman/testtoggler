@@ -6,7 +6,8 @@ const capitalize = require('lodash.capitalize');
 const testGlob = '{-,_,.}{test,Test,tests,Tests,TEST,TESTS,spec,Spec,SPEC,specs,Specs,SPECS}';
 const allTestFoldersGlob = `{__tests__,__test__,__spec__,__specs__,tests,specs,test,spec,Test,Spec,Tests,Specs}`;
 const isTestFileRegex = /(.+)[-_\.](tests?|specs?)\..+/i;
-const isTestFolderRegex = /_?_?(spec|test)s?_?_?/i;
+
+const excludeFromFileSearch = "/node_modules/";
 
 
 // const config = vscode.workspace.getConfiguration('testToggler');
@@ -29,70 +30,135 @@ export function deactivate() {}
 
 const toggleFile = async (currentFilename: string, workspacePath: string) => {
     const parentFolder = path.relative(workspacePath, path.dirname(currentFilename));
-
     const isCurrentFileATestMatch = path.basename(currentFilename).match(isTestFileRegex);
-    const fileToFindGlobs = (isCurrentFileATestMatch !== null) ?
-      getSourceFileGlobs(isCurrentFileATestMatch[1], parentFolder) :
+
+    const fileGlobs = (isCurrentFileATestMatch !== null) ?
+      getSourceFileGlobs(currentFilename, parentFolder, isCurrentFileATestMatch[1]) :
       getTestFileGlobs(currentFilename, parentFolder);
 
-    const file = await findFileFromGlobs(fileToFindGlobs);
+    const file = await findFileFromGlobs(fileGlobs, workspacePath, isCurrentFileATestMatch !== null);
     if (file)
       await openFile(file.fsPath);
     else
-      vscode.window.showErrorMessage(`Could not find ${!!isCurrentFileATestMatch ? 'source' : 'test'} file for '${path.basename(currentFilename)}'.`);
+      vscode.window.showWarningMessage(`Could not find ${!!isCurrentFileATestMatch ? 'source' : 'test'} file for '${path.basename(currentFilename)}'.`);
 };
 
-const getSourceFileGlobs = (baseName: string, parentFolder: string) => {
+const getSourceFileGlobs = (currentFilename: string, parentFolder: string, baseName: string) => {
+  const extension = path.extname(currentFilename);
+  const allBaseNames = getFilenameGlobPermutations(baseName);
+  const grandparentFolderPath = path.dirname(parentFolder);
+  const grandparentFolderName =  path.basename(grandparentFolderPath);
   const sourceGlobs = [];
-  const grandparentFolder = path.dirname(parentFolder);
-  const grandparentFolderName =  path.basename(grandparentFolder);
 
-  sourceGlobs.push(getSourceGlob(baseName, grandparentFolder));
+  /** Strategy 1: test has same name as source, but with a suffix (e.g. -test).
+   *      grandparentFolder
+   *        |- __tests__
+   *        |    |-baseName-test.tsx
+   *        |- baseName.tsx
+   */
+  sourceGlobs.push(path.join(grandparentFolderPath, `${allBaseNames}.*`));
 
+  /** Strategy 2: test has same name as `grandparentFolder`, but source is named index.*
+   *      grandparentFolder (This is `baseName`) 
+   *        |- __tests__
+   *        |    |-baseName-test.tsx
+   *        |- index.tsx
+   */
   if (grandparentFolderName === baseName)
-    sourceGlobs.push(getSourceGlob('index', grandparentFolder));
+    sourceGlobs.push(path.join(grandparentFolderPath, 'index.*'));
 
-  if (testIsInTopLevelTestDirectory(parentFolder)) {
-    const newGlob = getSourceFromFullTestPath(baseName, parentFolder);
-    console.log(newGlob);
-    sourceGlobs.push(newGlob);
-  }
+  /** Strategy 3: source and tests are in parallel folder hierarchies, and tests have a suffix.
+   *    src/path/to/baseName.rb
+   *    spec/path/to/baseName_spec.rb
+   */
+  sourceGlobs.push(getSourceFromFullTestPath(allBaseNames, parentFolder));
+
+
+  console.log('Searching for file with extension: ' + extension);
+  sourceGlobs.push(path.join('**', `${allBaseNames}${extension}`));
 
   return sourceGlobs;
 };
 
-const testIsInTopLevelTestDirectory = (parentFolder: string) => {
-  const [topLevelFolder] = parentFolder.split(path.sep);
-  return isTestFolderRegex.test(topLevelFolder);
-};
-
-const getSourceFromFullTestPath = (baseName: string, parentFolder: string) => {
-  const [_, ...sourcePath] = parentFolder.split(path.sep);
-  return path.join('**', sourcePath.join(path.sep), baseName + '.*');
+const getSourceFromFullTestPath = (allBaseNames: string, parentFolder: string) => {
+  // Remove the top-level folder since that would be `spec` or `tests` or something.
+  const [_, ...sourcePath] = parentFolder.split(path.sep); 
+  return path.join('**', sourcePath.join(path.sep), allBaseNames + '.*');
 };
 
 const getTestFileGlobs = (currentFilename: string, parentFolder: string) => {
-  const baseNameNoExtensions = path.basename(currentFilename, path.extname(currentFilename));
+  const extension = path.extname(currentFilename);
+  const baseNameNoExtensions = path.basename(currentFilename, extension);
   const parentFolderName = path.basename(path.dirname(currentFilename));
   const finalBaseName = baseNameNoExtensions === 'index' ? parentFolderName : baseNameNoExtensions;
+  const testGlobs = [];
 
-  return [getTestGlob(finalBaseName, parentFolder)];
+
+  /** Strategy 1:  Test is same name as parentFolder or the file itself with a suffix, located in a sibling tests folder.
+   *      parentFolderName
+   *        |- __tests__
+   *        |    |-baseName-test.tsx
+   *        |- baseName.tsx || index.tsx
+   */
+  testGlobs.push(path.join(parentFolder, allTestFoldersGlob, `${getAllTestGlobPermutations(finalBaseName)}.*`));
+
+  /** Strategy 2: Test is in a parallel hierarchy path.
+   *   src/path/to/baseName.rb
+   *   spec/path/to/baseName_spec.rb
+   */
+  testGlobs.push(getTestFromFullSourcePath(finalBaseName, parentFolder));
+
+  /** Strategy 3: Global search for test file as source file + suffix.
+   *   baseName.rb -> baseName_spec.rb
+   */
+  console.log('Checking for test file with extension: ' + extension);
+  testGlobs.push(path.join('**', `${getAllTestGlobPermutations(finalBaseName)}${extension}`));
+
+  return testGlobs;
+};
+
+const getTestFromFullSourcePath = (baseName: string, parentFolder: string) => {
+  // Remove the top-level folder since that would be `spec` or `tests` or something.
+  const [_, ...sourcePath] = parentFolder.split(path.sep); 
+  return path.join('**', sourcePath.join(path.sep), `${getAllTestGlobPermutations(baseName)}.*`);
 };
 
 // Look through all the possible globs for the first match.
-const findFileFromGlobs = async (fileGlobs: string[]) => {
-  for (let i=0; i<fileGlobs.length; ++i) {
-    const file = await findFileFromGlob(fileGlobs[i]);
+const findFileFromGlobs = async (fileGlobs: string[], workspacePath: string, lookingForSourceFile: boolean) => {
+  const normalStrategyGlobs = fileGlobs.slice(0, fileGlobs.length-1);
+  const globalSearchStrategy = fileGlobs[fileGlobs.length-1];
+
+  for (let i=0; i<normalStrategyGlobs.length; ++i) {
+    const file = await findFileFromGlob(normalStrategyGlobs[i]);
     if (file !== null) 
       return file;
   }
 
-  return null;
+  // Our fallback strategy is the global search, which isn't always accurate.
+  // If there are any hits here, present them to the user with a picker.
+  return findFileFromGlobAndGiveChoices(globalSearchStrategy, workspacePath, lookingForSourceFile) || null;
 };
 
 const findFileFromGlob = (fileGlob: string) => {
-  return vscode.workspace.findFiles(fileGlob, "/node_modules/")
+  return vscode.workspace.findFiles(fileGlob, excludeFromFileSearch)
     .then(uris => uris.length > 0 ? uris[0] : null);
+};
+
+const findFileFromGlobAndGiveChoices = (fileGlob: string, workspacePath: string, lookingForSourceFile: boolean) => {
+  return vscode.workspace.findFiles(fileGlob, excludeFromFileSearch)
+    .then(async uris => {
+      if (uris.length === 0) return null;
+
+      // Present choices.
+      const selectedPath = await vscode.window.showQuickPick(uris.map(uri => ({
+        label: path.basename(uri.fsPath),
+        description: path.relative(workspacePath, uri.fsPath)
+      })), {
+        placeHolder: `Possible ${lookingForSourceFile ? 'source' : 'test'} file(s) found...`
+      });
+      if (selectedPath) return vscode.Uri.file(path.join(workspacePath, selectedPath.description));
+      else return null;
+    });
 };
 
 async function openFile(filePath: string) {
@@ -104,12 +170,4 @@ const getFilenameGlobPermutations = (filename: string) => {
   return `{${filename},${filename.toLowerCase()},${filename.toUpperCase()},${capitalize(filename)}}`;
 };
 
-const getSourceGlob = (baseName: string, folder: string): string => {
-  const allBaseNames = getFilenameGlobPermutations(baseName);
-  return path.join(folder, `${allBaseNames}.*`);
-};
-
-const getTestGlob = (baseName: string, folder: string): string => {
-  const allBaseNames = getFilenameGlobPermutations(baseName);
-  return path.join(folder, allTestFoldersGlob, `${allBaseNames}${testGlob}.*`);
-};
+const getAllTestGlobPermutations = (baseName: string) => `${getFilenameGlobPermutations(baseName)}${testGlob}`;
