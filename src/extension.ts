@@ -1,12 +1,17 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+const capitalize = require('lodash.capitalize');
 
-const findFile = (fileGlob: string) => vscode.workspace.findFiles(fileGlob, "/node_modules/", 10)
+const findFile = (fileGlob: string) => {
+  
+
+  return vscode.workspace.findFiles(fileGlob, "/node_modules/", 10)
     .then(uris => {
       uris.map(uri => console.log(uri.fsPath));
       return uris.length > 0 ? uris[0] : null;
     });
+  };
 
 // If test && is javascript/typescript:
 //    Extract baseFilename from test file.
@@ -69,25 +74,26 @@ export function activate(context: vscode.ExtensionContext) {
     let fileGlob = '';
     const match = path.basename(currentFilename).match(isTestFileRegex);
     const isTestFile = match !== null;
-    if (match !== null)
+    if (match !== null) // isTestFile
       {
         const baseNameMinusTest = match[1];
         console.log(`Is a test file! baseName = ${baseNameMinusTest}`);
         const folderName =  path.basename(path.dirname(baseFolder));
 
-        if (folderName !== baseNameMinusTest)
-          fileGlob =  path.join(path.dirname(baseFolder), `${baseNameMinusTest}.*`);
-        else 
-          fileGlob =  path.join(path.dirname(baseFolder), `index.*`);
+        const finalBaseName = folderName !== baseNameMinusTest ? `${baseNameMinusTest}.*` : 'index.*';
+        const allBaseNames = `{${finalBaseName},${finalBaseName.toLowerCase()},${finalBaseName.toUpperCase()},${capitalize(finalBaseName)}}`;
+
+        fileGlob =  path.join(path.dirname(baseFolder), `${allBaseNames}`);
       } else {
         console.log('Is a source file!');
-        if (baseName === 'index') {
-          console.log('Current file is an index file!');
-          console.log(`Looking for ./__tests__/${parentFolderName}-test.*`);
-          fileGlob = path.join(baseFolder, '__tests__', `${parentFolderName}-test.*`);
-        } else {
-          fileGlob = path.join(baseFolder, '__tests__', `${baseName}-test.*`);
-        }
+        const testGlob = '{-,_,.}{test,Test,tests,Tests,TEST,TESTS,spec,Spec,SPEC,specs,Specs,SPECS}.*';
+
+        const finalBaseName = baseName === 'index' ? parentFolderName : baseName;
+        const allBaseNames = `{${finalBaseName},${finalBaseName.toLowerCase()},${finalBaseName.toUpperCase()},${capitalize(finalBaseName)}}`;
+
+        const allTestFolders = `{__tests__,__test__,__spec__,__specs__,tests,specs,test,spec}`;
+
+        fileGlob = path.join(baseFolder, allTestFolders, `${allBaseNames}${testGlob}`);
       }
 
     
