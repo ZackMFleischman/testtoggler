@@ -2,7 +2,13 @@
 	"name": "testtoggler",
 	"displayName": "Test Toggler",
 	"description": "Toggle back and forth from tests and source",
+    "publisher": "zackmfleischman","
 	"version": "0.0.1",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zackmfleischman/testtoggler"
+    },
 	"engines": {
 		"vscode": "^1.55.0"
 	},
@@ -17,7 +23,7 @@
 		"commands": [
 			{
 				"command": "extension.testToggler",
-				"title": "Toggle source/tests"
+				"title": "Toggle between source and tests"
 			}
 		],
 		"keybindings": [
