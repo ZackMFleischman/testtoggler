@@ -3,9 +3,10 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 const capitalize = require('lodash.capitalize');
 
-const findFile = (fileGlob: string) => {
-  
+const testGlob = '{-,_,.}{test,Test,tests,Tests,TEST,TESTS,spec,Spec,SPEC,specs,Specs,SPECS}.*';
+const allTestFoldersGlob = `{__tests__,__test__,__spec__,__specs__,tests,specs,test,spec}`;
 
+const findFile = (fileGlob: string) => {
   return vscode.workspace.findFiles(fileGlob, "/node_modules/", 10)
     .then(uris => {
       uris.map(uri => console.log(uri.fsPath));
@@ -40,6 +41,7 @@ async function openFileFrom(filePath: string) {
   await vscode.window.showTextDocument(textDocument);
 }
 
+const getFilenameGlobPermutations = (filename: string) => `{${filename},${filename.toLowerCase()},${filename.toUpperCase()},${capitalize(filename)}}`;
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -81,19 +83,15 @@ export function activate(context: vscode.ExtensionContext) {
         const folderName =  path.basename(path.dirname(baseFolder));
 
         const finalBaseName = folderName !== baseNameMinusTest ? `${baseNameMinusTest}.*` : 'index.*';
-        const allBaseNames = `{${finalBaseName},${finalBaseName.toLowerCase()},${finalBaseName.toUpperCase()},${capitalize(finalBaseName)}}`;
+        const allBaseNames = getFilenameGlobPermutations(finalBaseName);
 
         fileGlob =  path.join(path.dirname(baseFolder), `${allBaseNames}`);
       } else {
-        console.log('Is a source file!');
-        const testGlob = '{-,_,.}{test,Test,tests,Tests,TEST,TESTS,spec,Spec,SPEC,specs,Specs,SPECS}.*';
-
+        // Is a source file
         const finalBaseName = baseName === 'index' ? parentFolderName : baseName;
-        const allBaseNames = `{${finalBaseName},${finalBaseName.toLowerCase()},${finalBaseName.toUpperCase()},${capitalize(finalBaseName)}}`;
+        const allBaseNames = getFilenameGlobPermutations(finalBaseName);
 
-        const allTestFolders = `{__tests__,__test__,__spec__,__specs__,tests,specs,test,spec}`;
-
-        fileGlob = path.join(baseFolder, allTestFolders, `${allBaseNames}${testGlob}`);
+        fileGlob = path.join(baseFolder, allTestFoldersGlob, `${allBaseNames}${testGlob}`);
       }
 
     
