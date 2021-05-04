@@ -4,8 +4,9 @@ import * as path from 'path';
 const capitalize = require('lodash.capitalize');
 
 const testGlob = '{-,_,.}{test,Test,tests,Tests,TEST,TESTS,spec,Spec,SPEC,specs,Specs,SPECS}';
-const allTestFoldersGlob = `{__tests__,__test__,__spec__,__specs__,tests,specs,test,spec}`;
+const allTestFoldersGlob = `{__tests__,__test__,__spec__,__specs__,tests,specs,test,spec,Test,Spec,Tests,Specs}`;
 const isTestFileRegex = /(.+)[-_\.](tests?|specs?)\..+/i;
+const isTestFolderRegex = /_?_?(spec|test)s?_?_?/i;
 
 
 // const config = vscode.workspace.getConfiguration('testToggler');
@@ -51,7 +52,23 @@ const getSourceFileGlobs = (baseName: string, parentFolder: string) => {
   if (grandparentFolderName === baseName)
     sourceGlobs.push(getSourceGlob('index', grandparentFolder));
 
+  if (testIsInTopLevelTestDirectory(parentFolder)) {
+    const newGlob = getSourceFromFullTestPath(baseName, parentFolder);
+    console.log(newGlob);
+    sourceGlobs.push(newGlob);
+  }
+
   return sourceGlobs;
+};
+
+const testIsInTopLevelTestDirectory = (parentFolder: string) => {
+  const [topLevelFolder] = parentFolder.split(path.sep);
+  return isTestFolderRegex.test(topLevelFolder);
+};
+
+const getSourceFromFullTestPath = (baseName: string, parentFolder: string) => {
+  const [_, ...sourcePath] = parentFolder.split(path.sep);
+  return path.join('**', sourcePath.join(path.sep), baseName + '.*');
 };
 
 const getTestFileGlobs = (currentFilename: string, parentFolder: string) => {
