@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 const capitalize = require('lodash.capitalize');
 
-const testGlob = '{-,_,.}{test,Test,tests,Tests,TEST,TESTS,spec,Spec,SPEC,specs,Specs,SPECS}.*';
+const testGlob = '{-,_,.}{test,Test,tests,Tests,TEST,TESTS,spec,Spec,SPEC,specs,Specs,SPECS}';
 const allTestFoldersGlob = `{__tests__,__test__,__spec__,__specs__,tests,specs,test,spec}`;
 const isTestFileRegex = /(.+)[-_\.](tests?|specs?)\..+/i;
 
@@ -27,12 +27,12 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {}
 
 const toggleFile = async (currentFilename: string, workspacePath: string) => {
-    const baseFolder = path.relative(workspacePath, path.dirname(currentFilename));
+    const parentFolder = path.relative(workspacePath, path.dirname(currentFilename));
 
     const isCurrentFileATestMatch = path.basename(currentFilename).match(isTestFileRegex);
     const fileToFindGlobs = (isCurrentFileATestMatch !== null) ?
-      getSourceFileGlobs(isCurrentFileATestMatch[1], baseFolder) :
-      getTestFileGlobs(baseFolder, currentFilename);
+      getSourceFileGlobs(isCurrentFileATestMatch[1], parentFolder) :
+      getTestFileGlobs(currentFilename, parentFolder);
 
     const file = await findFileFromGlobs(fileToFindGlobs);
     if (file)
@@ -41,20 +41,25 @@ const toggleFile = async (currentFilename: string, workspacePath: string) => {
       vscode.window.showErrorMessage(`Could not find ${!!isCurrentFileATestMatch ? 'source' : 'test'} file for '${path.basename(currentFilename)}'.`);
 };
 
-const getSourceFileGlobs = (baseName: string, baseFolder: string) => {
-  const folderName =  path.basename(path.dirname(baseFolder));
+const getSourceFileGlobs = (baseName: string, parentFolder: string) => {
+  const sourceGlobs = [];
+  const grandparentFolder = path.dirname(parentFolder);
+  const grandparentFolderName =  path.basename(grandparentFolder);
 
-  return (folderName === baseName) ?
-    [getSourceGlob(baseName, baseFolder), getSourceGlob('index', baseFolder)] : 
-    [getSourceGlob(baseName, baseFolder)];
+  sourceGlobs.push(getSourceGlob(baseName, grandparentFolder));
+
+  if (grandparentFolderName === baseName)
+    sourceGlobs.push(getSourceGlob('index', grandparentFolder));
+
+  return sourceGlobs;
 };
 
-const getTestFileGlobs = (baseFolder: string, currentFilename: string) => {
+const getTestFileGlobs = (currentFilename: string, parentFolder: string) => {
   const baseNameNoExtensions = path.basename(currentFilename, path.extname(currentFilename));
   const parentFolderName = path.basename(path.dirname(currentFilename));
   const finalBaseName = baseNameNoExtensions === 'index' ? parentFolderName : baseNameNoExtensions;
 
-  return [getTestGlob(finalBaseName, baseFolder)];
+  return [getTestGlob(finalBaseName, parentFolder)];
 };
 
 // Look through all the possible globs for the first match.
@@ -82,12 +87,12 @@ const getFilenameGlobPermutations = (filename: string) => {
   return `{${filename},${filename.toLowerCase()},${filename.toUpperCase()},${capitalize(filename)}}`;
 };
 
-const getSourceGlob = (baseName: string, baseFolder: string): string => {
-  const allBaseNames = getFilenameGlobPermutations(baseName + '.*');
-  return path.join(path.dirname(baseFolder), `${allBaseNames}`);
+const getSourceGlob = (baseName: string, folder: string): string => {
+  const allBaseNames = getFilenameGlobPermutations(baseName);
+  return path.join(folder, `${allBaseNames}.*`);
 };
 
-const getTestGlob = (baseName: string, baseFolder: string): string => {
+const getTestGlob = (baseName: string, folder: string): string => {
   const allBaseNames = getFilenameGlobPermutations(baseName);
-  return path.join(baseFolder, allTestFoldersGlob, `${allBaseNames}${testGlob}`);
+  return path.join(folder, allTestFoldersGlob, `${allBaseNames}${testGlob}.*`);
 };
