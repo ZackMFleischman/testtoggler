@@ -2,13 +2,13 @@
 	"name": "testtoggler",
 	"displayName": "Test Toggler",
 	"description": "Toggle back and forth from tests and source",
-    "publisher": "zackmfleischman","
+	"publisher": "zackmfleischman",
 	"version": "0.0.1",
-    "license": "MIT",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/zackmfleischman/testtoggler"
-    },
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/zackmfleischman/testtoggler"
+	},
 	"engines": {
 		"vscode": "^1.55.0"
 	},
