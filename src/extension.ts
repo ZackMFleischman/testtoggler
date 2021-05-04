@@ -154,7 +154,7 @@ const findFileFromGlobAndGiveChoices = (fileGlob: string, workspacePath: string,
         label: path.basename(uri.fsPath),
         description: path.relative(workspacePath, uri.fsPath)
       })), {
-        placeHolder: `Possible ${lookingForSourceFile ? 'source' : 'test'} file(s) found...`
+        placeHolder: `Possible ${lookingForSourceFile ? 'source' : 'test'} file${uris.length === 1 ? '' : 's'} found.`
       });
       if (selectedPath) return vscode.Uri.file(path.join(workspacePath, selectedPath.description));
       else return null;
