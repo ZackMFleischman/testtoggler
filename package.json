@@ -26,6 +26,26 @@
 				"title": "Toggle between source and tests"
 			}
 		],
+    "configuration": {
+      "title": "Test Toggler",
+      "properties": {
+        "testToggler.testFilePattern": {
+          "type": "string",
+          "default": "",
+          "description": "Enter a custom test file name."
+        },
+        "testToggler.testFolderName": {
+          "type": "string",
+          "default": "",
+          "description": "Enter the folder name(s) you keep tests in.\nEnter multiple names in a glob pattern (e.g. '{FolderName1,FolderName2}')\n\nDefaults are 'test(s)', 'spec(s)', '__test(s)__', and '__spec(s)__'"
+        },
+        "testToggler.confirmOnSinglePossibilityWhenUnsure": {
+          "type": "boolean",
+          "default": true,
+          "description": "The fallback strategy is a global search for the test/source file pattern. Depending on your codebase, this has a larger chance of yielding false positives. In this situation, a list of possible file matches will be presented to you. If there's only 1 match, and this option is NOT checked, it will just toggle to the file."
+        }
+      }
+    },
 		"keybindings": [
 			{
 				"command": "extension.testToggler",

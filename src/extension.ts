@@ -3,6 +3,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 const capitalize = require('lodash.capitalize');
 
+const extensionName = 'testToggler';
+
 const testGlob = '{-,_,.}{test,Test,tests,Tests,TEST,TESTS,spec,Spec,SPEC,specs,Specs,SPECS}';
 const allTestFoldersGlob = `{__tests__,__test__,__spec__,__specs__,tests,specs,test,spec,Test,Spec,Tests,Specs}`;
 const isTestFileRegex = /(.+)[-_\.](tests?|specs?)\..+/i;
@@ -10,9 +12,8 @@ const isTestFileRegex = /(.+)[-_\.](tests?|specs?)\..+/i;
 const excludeFromFileSearch = "/node_modules/";
 
 
-// const config = vscode.workspace.getConfiguration('testToggler');
 export function activate(context: vscode.ExtensionContext) {
-	let testTogglerDisposable = vscode.commands.registerCommand('extension.testToggler', async () => {
+	let testTogglerDisposable = vscode.commands.registerCommand(`extension.${extensionName}`, async () => {
     const currentDocument = vscode.window.activeTextEditor?.document; 
     if (!currentDocument) return;
 
@@ -26,6 +27,8 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {}
+
+const getConfigValue = (propertyName: string) => vscode.workspace.getConfiguration(extensionName).get(propertyName);
 
 const toggleFile = async (currentFilename: string, workspacePath: string) => {
     const parentFolder = path.relative(workspacePath, path.dirname(currentFilename));
@@ -100,6 +103,10 @@ const getTestFileGlobs = (currentFilename: string, parentFolder: string) => {
    *        |- baseName.tsx || index.tsx
    */
   testGlobs.push(path.join(parentFolder, allTestFoldersGlob, `${getAllTestGlobPermutations(finalBaseName)}.*`));
+  const customTestFolderName = getConfigValue('testFolderName') as string;
+  if (customTestFolderName)
+    testGlobs.push(path.join(parentFolder, customTestFolderName, `${getAllTestGlobPermutations(finalBaseName)}.*`));
+
 
   /** Strategy 2: Test is in a parallel hierarchy path.
    *   src/path/to/baseName.rb
@@ -146,6 +153,9 @@ const findFileFromGlobAndGiveChoices = (fileGlob: string, workspacePath: string,
   return vscode.workspace.findFiles(fileGlob, excludeFromFileSearch)
     .then(async uris => {
       if (uris.length === 0) return null;
+
+      if (uris.length === 1 && !getConfigValue('confirmOnSinglePossibilityWhenUnsure'))
+        return vscode.Uri.file(uris[0].fsPath);
 
       // Present choices.
       const selectedPath = await vscode.window.showQuickPick(uris.map(uri => ({
