@@ -3,12 +3,16 @@
 	"displayName": "Test Toggler",
 	"description": "Toggle back and forth from tests and source",
 	"publisher": "zackmfleischman",
+  "author": {
+    "name": "zackmfleischman"
+  },
 	"version": "0.0.1",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/zackmfleischman/testtoggler"
 	},
+  "homepage": "https://github.com/zackmfleischman/testtoggler/blob/main/README.md",
 	"engines": {
 		"vscode": "^1.55.0"
 	},
@@ -19,6 +23,7 @@
 		"onCommand:extension.testToggler"
 	],
 	"main": "./out/extension.js",
+  "icon": "images/icon.png",
 	"contributes": {
 		"commands": [
 			{
