@@ -2,6 +2,8 @@
 
 This extension auto-magically switches between the tests for a source file and back at the touch of a keyboard shortcut (default is Mac: cmd+shift+t, Win/Linux: ctrl+shift+t).
 
+<img src="https://raw.githubusercontent.com/ZackMFleischman/testtoggler/main/images/demo.gif" width="400" height="auto" />
+
 ## Features
 
 It uses several strategies to try and locate the corresponding source/test files, and toggles to the file the first time one is matched.
