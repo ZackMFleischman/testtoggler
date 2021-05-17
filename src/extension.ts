@@ -30,7 +30,6 @@ export function deactivate() {}
 const toggleFile = async (currentFilename: string, workspacePath: string) => {
     const parentFolder = path.relative(workspacePath, path.dirname(currentFilename));
     const isCurrentFileATestMatch = path.basename(currentFilename).match(isTestFileRegex);
-    console.log('Current file: ' + currentFilename);
 
     // Get the file patterns to search for.
     const fileGlobs = (isCurrentFileATestMatch !== null) ?
@@ -75,7 +74,6 @@ const getSourceFileGlobs = (currentFilename: string, parentFolder: string, baseN
   sourceGlobs.push(getSourceFromFullTestPath(allBaseNames, parentFolder));
 
 
-  console.log('Searching for file with extension: ' + extension);
   sourceGlobs.push(path.join('**', `${allBaseNames}${extension}`));
 
   return sourceGlobs;
@@ -112,14 +110,13 @@ const getTestFileGlobs = (currentFilename: string, parentFolder: string) => {
   /** Strategy 3: Global search for test file as source file + suffix.
    *   baseName.rb -> baseName_spec.rb
    */
-  console.log('Checking for test file with extension: ' + extension);
   testGlobs.push(path.join('**', `${getAllTestGlobPermutations(finalBaseName)}${extension}`));
 
   return testGlobs;
 };
 
 const getTestFromFullSourcePath = (baseName: string, parentFolder: string) => {
-  // Remove the top-level folder since that would be `spec` or `tests` or something.
+  // Remove the top-level folder since that would be `src` or `libs` or something.
   const [_, ...sourcePath] = parentFolder.split(path.sep); 
   return path.join('**', sourcePath.join(path.sep), `${getAllTestGlobPermutations(baseName)}.*`);
 };
