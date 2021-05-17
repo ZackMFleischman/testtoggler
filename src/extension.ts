@@ -12,8 +12,7 @@ const excludeFromFileSearch = "/node_modules/";
 
 // const config = vscode.workspace.getConfiguration('testToggler');
 export function activate(context: vscode.ExtensionContext) {
-
-	let disposable = vscode.commands.registerCommand('extension.testToggler', async () => {
+	let testTogglerDisposable = vscode.commands.registerCommand('extension.testToggler', async () => {
     const currentDocument = vscode.window.activeTextEditor?.document; 
     if (!currentDocument) return;
 
@@ -23,7 +22,7 @@ export function activate(context: vscode.ExtensionContext) {
     await toggleFile(currentDocument.fileName, workspacePath);
 	});
 
-	context.subscriptions.push(disposable);
+	context.subscriptions.push(testTogglerDisposable);
 }
 
 export function deactivate() {}
@@ -31,12 +30,14 @@ export function deactivate() {}
 const toggleFile = async (currentFilename: string, workspacePath: string) => {
     const parentFolder = path.relative(workspacePath, path.dirname(currentFilename));
     const isCurrentFileATestMatch = path.basename(currentFilename).match(isTestFileRegex);
+    console.log('Current file: ' + currentFilename);
 
+    // Get the file patterns to search for.
     const fileGlobs = (isCurrentFileATestMatch !== null) ?
       getSourceFileGlobs(currentFilename, parentFolder, isCurrentFileATestMatch[1]) :
       getTestFileGlobs(currentFilename, parentFolder);
 
-    const file = await findFileFromGlobs(fileGlobs, workspacePath, isCurrentFileATestMatch !== null);
+    const file = await findFileFromGlobs(fileGlobs, workspacePath, currentFilename, isCurrentFileATestMatch !== null);
     if (file)
       await openFile(file.fsPath);
     else
@@ -91,7 +92,7 @@ const getTestFileGlobs = (currentFilename: string, parentFolder: string) => {
   const baseNameNoExtensions = path.basename(currentFilename, extension);
   const parentFolderName = path.basename(path.dirname(currentFilename));
   const finalBaseName = baseNameNoExtensions === 'index' ? parentFolderName : baseNameNoExtensions;
-  const testGlobs = [];
+  const testGlobs: string[] = [];
 
 
   /** Strategy 1:  Test is same name as parentFolder or the file itself with a suffix, located in a sibling tests folder.
@@ -124,13 +125,13 @@ const getTestFromFullSourcePath = (baseName: string, parentFolder: string) => {
 };
 
 // Look through all the possible globs for the first match.
-const findFileFromGlobs = async (fileGlobs: string[], workspacePath: string, lookingForSourceFile: boolean) => {
+const findFileFromGlobs = async (fileGlobs: string[], workspacePath: string, currentFilename: string, lookingForSourceFile: boolean) => {
   const normalStrategyGlobs = fileGlobs.slice(0, fileGlobs.length-1);
   const globalSearchStrategy = fileGlobs[fileGlobs.length-1];
 
   for (let i=0; i<normalStrategyGlobs.length; ++i) {
     const file = await findFileFromGlob(normalStrategyGlobs[i]);
-    if (file !== null) 
+    if (file !== null && file.fsPath !== currentFilename) 
       return file;
   }
 
