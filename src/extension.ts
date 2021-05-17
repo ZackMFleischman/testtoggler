@@ -28,11 +28,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {}
 
-const getConfigValue = (propertyName: string) => vscode.workspace.getConfiguration(extensionName).get(propertyName);
-
 const toggleFile = async (currentFilename: string, workspacePath: string) => {
     const parentFolder = path.relative(workspacePath, path.dirname(currentFilename));
-    const isCurrentFileATestMatch = path.basename(currentFilename).match(isTestFileRegex);
+    const isCurrentFileATestMatch = isCurrentFileATestFile(path.basename(currentFilename));
 
     // Get the file patterns to search for.
     const fileGlobs = (isCurrentFileATestMatch !== null) ?
@@ -44,6 +42,21 @@ const toggleFile = async (currentFilename: string, workspacePath: string) => {
       await openFile(file.fsPath);
     else
       vscode.window.showWarningMessage(`Could not find ${!!isCurrentFileATestMatch ? 'source' : 'test'} file for '${path.basename(currentFilename)}'.`);
+};
+
+const getConfigValue = (propertyName: string) => vscode.workspace.getConfiguration(extensionName).get(propertyName);
+
+const isCurrentFileATestFile = (currentBasename: string) => {
+  // Check the custom test file suffix too.
+  const customTestFileSuffix = getConfigValue('testFileSuffix');
+  if (customTestFileSuffix) {
+    const regex = new RegExp(`(.+)${customTestFileSuffix}\..+`, 'i');
+    const match = regex.exec(currentBasename);
+    if (match !== null)
+      return match;
+  }  
+
+  return currentBasename.match(isTestFileRegex);
 };
 
 const getSourceFileGlobs = (currentFilename: string, parentFolder: string, baseName: string) => {
@@ -94,7 +107,7 @@ const getTestFileGlobs = (currentFilename: string, parentFolder: string) => {
   const parentFolderName = path.basename(path.dirname(currentFilename));
   const finalBaseName = baseNameNoExtensions === 'index' ? parentFolderName : baseNameNoExtensions;
   const testGlobs: string[] = [];
-
+  const customTestFileSuffix: string = getConfigValue('testFileSuffix') as string;
 
   /** Strategy 1:  Test is same name as parentFolder or the file itself with a suffix, located in a sibling tests folder.
    *      parentFolderName
@@ -103,29 +116,38 @@ const getTestFileGlobs = (currentFilename: string, parentFolder: string) => {
    *        |- baseName.tsx || index.tsx
    */
   testGlobs.push(path.join(parentFolder, allTestFoldersGlob, `${getAllTestGlobPermutations(finalBaseName)}.*`));
-  const customTestFolderName = getConfigValue('testFolderName') as string;
-  if (customTestFolderName)
-    testGlobs.push(path.join(parentFolder, customTestFolderName, `${getAllTestGlobPermutations(finalBaseName)}.*`));
+  if (customTestFileSuffix)
+    testGlobs.push(path.join(parentFolder, allTestFoldersGlob, `${getAllTestGlobPermutations(finalBaseName, customTestFileSuffix)}.*`));
 
+  const customTestFolderName = getConfigValue('testFolderName') as string;
+  if (customTestFolderName) {
+    testGlobs.push(path.join(parentFolder, customTestFolderName, `${getAllTestGlobPermutations(finalBaseName)}.*`));
+    if (customTestFileSuffix)
+      testGlobs.push(path.join(parentFolder, customTestFolderName, `${getAllTestGlobPermutations(finalBaseName, customTestFileSuffix)}.*`));
+  }
 
   /** Strategy 2: Test is in a parallel hierarchy path.
    *   src/path/to/baseName.rb
    *   spec/path/to/baseName_spec.rb
    */
   testGlobs.push(getTestFromFullSourcePath(finalBaseName, parentFolder));
+  if (getConfigValue('testFileSuffix'))
+    testGlobs.push(getTestFromFullSourcePath(finalBaseName, parentFolder, getConfigValue('testFileSuffix') as string));
 
   /** Strategy 3: Global search for test file as source file + suffix.
    *   baseName.rb -> baseName_spec.rb
    */
   testGlobs.push(path.join('**', `${getAllTestGlobPermutations(finalBaseName)}${extension}`));
+  if (getConfigValue('testFileSuffix'))
+    testGlobs.push(path.join('**', `${getAllTestGlobPermutations(finalBaseName, getConfigValue('testFileSuffix') as string)}${extension}`));
 
   return testGlobs;
 };
 
-const getTestFromFullSourcePath = (baseName: string, parentFolder: string) => {
+const getTestFromFullSourcePath = (baseName: string, parentFolder: string, customSuffix?: string) => {
   // Remove the top-level folder since that would be `src` or `libs` or something.
   const [_, ...sourcePath] = parentFolder.split(path.sep); 
-  return path.join('**', sourcePath.join(path.sep), `${getAllTestGlobPermutations(baseName)}.*`);
+  return path.join('**', sourcePath.join(path.sep), `${getAllTestGlobPermutations(baseName, customSuffix)}.*`);
 };
 
 // Look through all the possible globs for the first match.
@@ -178,4 +200,4 @@ const getFilenameGlobPermutations = (filename: string) => {
   return `{${filename},${filename.toLowerCase()},${filename.toUpperCase()},${capitalize(filename)}}`;
 };
 
-const getAllTestGlobPermutations = (baseName: string) => `${getFilenameGlobPermutations(baseName)}${testGlob}`;
+const getAllTestGlobPermutations = (baseName: string, customSuffix?: string) => `${getFilenameGlobPermutations(baseName)}${customSuffix ? customSuffix : testGlob}`;
